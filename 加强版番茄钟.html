@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>诡秘之主 · 命运时钟</title>
+  <style>
+    :root {
+      --gold-bright: #f0d58c;
+      --gold-dull: #c5a059;
+      --blood-red: #8e0a0a;
+      --deep-black: #0a0a0c;
+      --mist-gray: #7d7d7d;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #050507;
+      background-image: radial-gradient(circle at 50% 50%, rgba(30, 30, 40, 0.5) 0%, #050507 100%), url('https://www.transparenttextures.com/patterns/stardust.png');
+      min-height: 100vh;
+      font-family: 'Constantia', 'Palatino', 'Noto Serif SC', serif;
+      color: #e0d8c0;
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+
+    .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.5rem; max-width: 1500px; width: 100%; }
+
+    /* --- 精致卡片 UI --- */
+    .card {
+      background: rgba(15, 15, 20, 0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(197, 160, 89, 0.2);
+      border-radius: 4px; padding: 2.5rem 1.8rem; position: relative;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.8); transition: all 0.6s ease;
+    }
+    .card::before, .card::after { content: ""; position: absolute; width: 20px; height: 20px; border: 1px solid var(--gold-dull); }
+    .card::before { top: 10px; left: 10px; border-right: 0; border-bottom: 0; }
+    .card::after { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+
+    .card-header {
+      font-size: 1.4rem; text-align: center; letter-spacing: 0.4rem; color: var(--gold-dull);
+      border-bottom: 1px solid rgba(197, 160, 89, 0.2); padding-bottom: 1.2rem; margin-bottom: 2rem;
+    }
+
+    /* --- 主题切换逻辑 --- */
+    .theme-leonard { --accent: var(--blood-red); border-color: rgba(142, 10, 10, 0.4); }
+    .theme-leonard .timer { color: #ff4d4d; text-shadow: 0 0 20px var(--blood-red); }
+    .theme-leonard .phase { background: var(--blood-red); color: white; }
+    .theme-leonard .active { background: var(--blood-red) !important; color: white !important; }
+
+    .theme-klein { --accent: var(--gold-bright); border-color: rgba(240, 213, 140, 0.3); }
+    .theme-klein .timer { color: var(--gold-bright); text-shadow: 0 0 20px rgba(240, 213, 140, 0.5); }
+    .theme-klein .phase { background: var(--mist-gray); color: var(--gold-bright); border: 1px solid var(--gold-bright); }
+    .theme-klein .active { background: var(--gold-bright) !important; color: #000 !important; }
+
+    .theme-switch { display: flex; background: rgba(0,0,0,0.4); padding: 4px; margin-bottom: 2rem; }
+    .theme-btn { flex: 1; background: transparent; border: none; color: #666; padding: 0.8rem; cursor: pointer; transition: 0.4s; }
+
+    /* --- 计时器与输入区 --- */
+    .timer { font-size: 5rem; text-align: center; margin: 1rem 0; font-weight: 300; }
+    .phase { display: block; width: fit-content; margin: 0 auto; padding: 0.4rem 2rem; letter-spacing: 4px; }
+    
+    .time-config { display: flex; justify-content: center; gap: 10px; margin-bottom: 1rem; font-size: 0.8rem; align-items: center; }
+    .time-config input { background: #000; border: 1px solid #444; color: var(--gold-dull); width: 45px; padding: 5px; text-align: center; }
+
+    .whisper-box {
+      min-height: 100px; padding: 1.2rem; margin: 1.5rem 0; background: rgba(255,255,255,0.03);
+      border-left: 2px solid var(--accent); font-style: italic; display: flex; align-items: center; justify-content: center; color: #999; line-height: 1.6; text-align: center;
+    }
+
+    .control-group { display: flex; gap: 10px; }
+    .ctrl-btn { flex: 1; background: transparent; border: 1px solid rgba(197, 160, 89, 0.2); color: var(--gold-dull); padding: 0.8rem; cursor: pointer; transition: 0.3s; }
+    .ctrl-btn:hover { background: var(--accent); color: white; }
+
+    /* --- 备忘录 & 占卜 --- */
+    .todo-item { list-style: none; padding: 0.8rem 0.5rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 12px; }
+    .prayer-display { background: rgba(0,0,0,0.4); padding: 1.5rem; border: 1px double var(--gold-dull); margin-top: 1rem; text-align: center; }
+    .question-echo { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px dashed rgba(197, 160, 89, 0.3); color: #fff; font-style: italic; }
+    .oracle-status { font-weight: bold; margin-top: 10px; font-size: 1.4rem; text-transform: uppercase; }
+
+    @media (max-width: 1200px) { .dashboard { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard">
+    <div class="card theme-leonard" id="tomatoCard">
+      <div class="card-header">灵性钟摆</div>
+      <div class="theme-switch">
+        <button id="themeLeonardBtn" class="theme-btn active">星星</button>
+        <button id="themeKleinBtn" class="theme-btn">愚者</button>
+      </div>
+
+      <div class="time-config">
+        <span>冥想</span><input type="number" id="workInput" value="25">
+        <span>间歇</span><input type="number" id="breakInput" value="5">
+        <button id="applyBtn" style="background:none; border:1px solid #444; color:#777; padding:2px 8px; cursor:pointer;">应用</button>
+      </div>
+
+      <div id="phaseLabel" class="phase">沉夜</div>
+      <div id="timerDisplay" class="timer">25:00</div>
+
+      <div class="whisper-box" id="whisperBox">
+        <span id="whisperText">“每一首诗的终点，都是星星落下的地方。”</span>
+      </div>
+
+      <div class="control-group">
+        <button class="ctrl-btn" id="startBtn">启动</button>
+        <button class="ctrl-btn" id="pauseBtn">静止</button>
+        <button class="ctrl-btn" id="resetBtn">重溯</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">非凡备忘</div>
+      <div style="display:flex; gap:10px; margin-bottom:1.5rem;">
+        <input type="text" id="newTodoInput" placeholder="记录灵性低语..." style="flex:1; background:#000; border:1px solid #333; color:var(--gold-dull); padding:10px;">
+        <button id="addTodoBtn" style="background:var(--gold-dull); border:none; padding:0 20px; cursor:pointer;">+</button>
+      </div>
+      <ul id="todoListContainer"></ul>
+    </div>
+
+    <div class="card">
+      <div class="card-header">灰雾启示</div>
+      <button id="prayerBtn" style="width:100%; padding:1.2rem; background:rgba(197,160,89,0.1); border:1px solid var(--gold-dull); color:var(--gold-dull); cursor:pointer;">开启仪式</button>
+      <div id="questionSection" style="display:none; flex-direction: column; gap: 1rem; margin-top: 1rem;">
+        <input type="text" id="questionInput" placeholder="请输入你的困惑..." style="width:100%; padding:12px; background:#000; border:1px solid #444; color:#fff;">
+        <button class="ctrl-btn" id="invokeBtn">祈求启示</button>
+        <div id="prayerDisplay" class="prayer-display" style="display:none;">
+          <div style="color:var(--gold-dull); font-size:0.9rem; line-height:2;">
+            不属于这个时代的愚者<br>灰雾之上的神秘主宰<br>执掌好运的黄黑之王
+          </div>
+          <div id="echoQuestion" class="question-echo"></div>
+          <div id="resultArea" style="display:none; margin-top:1.5rem;">
+            <div id="diceResult" style="font-size: 3rem; color: var(--gold-bright);"></div>
+            <div id="oracleAnswer" class="oracle-status"></div>
+            <button id="resetPrayerBtn" style="background:none; border:none; color:#555; cursor:pointer; text-decoration:underline; margin-top:10px;">结束仪式</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const themes = {
+        leonard: {
+          workName: '沉夜', breakName: '启音',
+          quotes: [
+            "“时间从未等待过任何人，包括天使。”",
+            "“老头，你觉得这个计划有成功的可能吗？”",
+            "“我们是守护者，也是一群对抗疯狂的可怜虫。”",
+            "“星星在注视你的每一次呼吸。”",
+            "“每一首诗的终点，都是星星落下的地方。”",
+            "“总有些事情，比生命更值得我们去守护。”",
+            "“不，那不是幻听，那是命运在敲门。”",
+            "“有时候，沉默比诗歌更有力量。”",
+            "“如果注定要坠入黑暗，我希望我是最后那颗星。”",
+            "“诗人总是感性的，但红手套必须理性。”",
+            "“你说，灰雾之上的那位，真的在看吗？”",
+            "“睡吧，梦里没有那些滑腻的低语。”"
+          ]
+        },
+        klein: {
+          workName: '占卜', breakName: '梦境',
+          quotes: [
+            "“命运恒在。”",
+            "“在这灰雾之上，一切都有代价。”",
+            "“这是一个简单的硬币占卜。”",
+            "“保持冷静，这是非凡者的第一准则。”",
+            "“福生玄黄天尊……不，现在我是愚者。”",
+            "“生活总要继续，即便是在疯狂的边缘。”",
+            "“不要直视那片雾。”",
+            "“灵性直觉告诉我，现在你应该专注。”",
+            "“万物皆有其神性，也皆有其人性。”",
+            "“我是周明瑞，也是克莱恩·莫雷蒂。”",
+            "“灰雾之下，众生平等地承受痛苦。”",
+            "“世界先生建议你，休息时喝杯甜冰茶。”"
+          ]
+        }
+      };
+
+      let currentTheme = themes.leonard;
+      let workMin = 25, breakMin = 5;
+      let totalSeconds = workMin * 60;
+      let timer = null, currentPhase = 'work';
+
+      const timerDisplay = document.getElementById('timerDisplay');
+      const whisperText = document.getElementById('whisperText');
+      const tomatoCard = document.getElementById('tomatoCard');
+
+      function updateDisplay() {
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        timerDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        document.getElementById('phaseLabel').textContent = (currentPhase === 'work') ? currentTheme.workName : currentTheme.breakName;
+      }
+
+      function setTheme(tKey) {
+        currentTheme = themes[tKey];
+        tomatoCard.className = `card tomato-card theme-${tKey}`;
+        document.getElementById('themeLeonardBtn').classList.toggle('active', tKey === 'leonard');
+        document.getElementById('themeKleinBtn').classList.toggle('active', tKey === 'klein');
+        updateDisplay();
+        whisperText.textContent = currentTheme.quotes[Math.floor(Math.random()*currentTheme.quotes.length)];
+      }
+
+      document.getElementById('applyBtn').onclick = () => {
+        workMin = parseInt(document.getElementById('workInput').value) || 25;
+        breakMin = parseInt(document.getElementById('breakInput').value) || 5;
+        totalSeconds = (currentPhase === 'work' ? workMin : breakMin) * 60;
+        updateDisplay();
+      };
+
+      document.getElementById('startBtn').onclick = () => {
+        if(timer) return;
+        timer = setInterval(() => {
+          totalSeconds--; updateDisplay();
+          if(totalSeconds <= 0) {
+            clearInterval(timer); timer = null;
+            currentPhase = (currentPhase === 'work' ? 'break' : 'work');
+            totalSeconds = (currentPhase === 'work' ? workMin : breakMin) * 60;
+            setTheme(document.getElementById('themeLeonardBtn').classList.contains('active') ? 'leonard' : 'klein');
+          }
+        }, 1000);
+      };
+
+      document.getElementById('pauseBtn').onclick = () => { clearInterval(timer); timer = null; };
+      document.getElementById('resetBtn').onclick = () => { 
+        clearInterval(timer); timer = null; 
+        totalSeconds = (currentPhase === 'work' ? workMin : breakMin) * 60; 
+        updateDisplay(); 
+      };
+
+      document.getElementById('themeLeonardBtn').onclick = () => setTheme('leonard');
+      document.getElementById('themeKleinBtn').onclick = () => setTheme('klein');
+
+      // 占卜
+      document.getElementById('prayerBtn').onclick = () => {
+        document.getElementById('prayerBtn').style.display = 'none';
+        document.getElementById('questionSection').style.display = 'flex';
+      };
+
+      document.getElementById('invokeBtn').onclick = () => {
+        const q = document.getElementById('questionInput').value;
+        if(!q) return;
+        document.getElementById('prayerDisplay').style.display = 'block';
+        document.getElementById('echoQuestion').textContent = `「 ${q} 」`;
+        setTimeout(() => {
+          const roll = Math.floor(Math.random() * 6) + 1;
+          const isYes = roll % 2 !== 0;
+          document.getElementById('diceResult').textContent = isYes ? '✔' : '✘';
+          document.getElementById('oracleAnswer').innerHTML = isYes ? 
+            `<span style="color:var(--gold-bright)">【 肯定 】</span><br><small>愚者颔首，好运将至</small>` : 
+            `<span style="color:var(--mist-gray)">【 否定 】</span><br><small>灰雾沉寂，并非良机</small>`;
+          document.getElementById('resultArea').style.display = 'block';
+        }, 800);
+      };
+
+      document.getElementById('resetPrayerBtn').onclick = () => {
+        document.getElementById('questionSection').style.display = 'none';
+        document.getElementById('resultArea').style.display = 'none';
+        document.getElementById('prayerDisplay').style.display = 'none';
+        document.getElementById('prayerBtn').style.display = 'block';
+      };
+
+      document.getElementById('addTodoBtn').onclick = () => {
+        const input = document.getElementById('newTodoInput');
+        if(!input.value) return;
+        const li = document.createElement('li');
+        li.className = 'todo-item';
+        li.innerHTML = `<input type="checkbox"> <span style="flex:1">${input.value}</span>`;
+        document.getElementById('todoListContainer').prepend(li);
+        input.value = '';
+      };
+    })();
+  </script>
+</body>
+</html>
